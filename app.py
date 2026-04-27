@@ -43,12 +43,8 @@ def refresh():
             from crawl import run_crawl
             from generate_dashboard import main as generate_dashboard
 
-            # Quick crawl for speed on free hosting
-            quick_districts = [
-                "Quận 1", "Quận 7", "Quận Bình Thạnh", "Quận Gò Vấp",
-                "Thành phố Thủ Đức", "Quận Tân Bình", "Huyện Bình Chánh"
-            ]
-            df = run_crawl(districts=quick_districts, max_pages=2)
+            # Full crawl — all districts, same as local run.py
+            df = run_crawl()
             generate_dashboard()
 
             refresh_state["last_run"] = datetime.now().isoformat()
