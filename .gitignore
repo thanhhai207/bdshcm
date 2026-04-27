@@ -1,0 +1,15 @@
+__pycache__/
+*.pyc
+*.pyo
+.env
+venv/
+haienv/
+# Keep archive CSVs out of git, but include latest data for deployment
+data/listings_2*.csv
+!data/listings_latest.csv
+!data/listings_latest.json
+debug_*.html
+debug_*.py
+discover_codes.py
+check_data.py
+test_crawlers.py

@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HCMC Real Estate Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:#0f172a;color:#e2e8f0;line-height:1.6}
+.header{background:linear-gradient(135deg,#1e293b 0%,#0f172a 100%);border-bottom:1px solid #334155;padding:24px 32px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:16px}
+.header h1{font-size:1.75rem;font-weight:700;background:linear-gradient(90deg,#38bdf8,#818cf8);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.header .meta{font-size:.85rem;color:#94a3b8}
+.container{max-width:1400px;margin:0 auto;padding:24px}
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:32px}
+.stat-card{background:#1e293b;border:1px solid #334155;border-radius:12px;padding:20px;text-align:center}
+.stat-card .value{font-size:2rem;font-weight:700;color:#38bdf8}
+.stat-card .label{font-size:.85rem;color:#94a3b8;margin-top:4px}
+.chart-grid{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:32px}
+.chart-card{background:#1e293b;border:1px solid #334155;border-radius:12px;padding:24px}
+.chart-card.full{grid-column:1/-1}
+.chart-card h2{font-size:1.1rem;font-weight:600;margin-bottom:16px;color:#f1f5f9}
+.chart-container{position:relative;width:100%;max-height:450px}
+.filters{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:24px;align-items:center}
+.filters label{font-size:.85rem;color:#94a3b8}
+.filters select,.filters input{background:#1e293b;border:1px solid #475569;color:#e2e8f0;padding:8px 12px;border-radius:8px;font-size:.9rem}
+.filters select:focus,.filters input:focus{outline:none;border-color:#38bdf8}
+.table-wrapper{overflow-x:auto;border-radius:12px;border:1px solid #334155;margin-bottom:32px}
+table{width:100%;border-collapse:collapse;font-size:.85rem}
+thead th{background:#1e293b;padding:12px 16px;text-align:left;font-weight:600;color:#94a3b8;border-bottom:1px solid #334155;cursor:pointer;user-select:none;white-space:nowrap}
+thead th:hover{color:#38bdf8}
+thead th.sorted-asc::after{content:" ▲";color:#38bdf8}
+thead th.sorted-desc::after{content:" ▼";color:#38bdf8}
+tbody td{padding:10px 16px;border-bottom:1px solid #1e293b}
+tbody tr{background:#0f172a}
+tbody tr:hover{background:#1e293b}
+a{color:#38bdf8;text-decoration:none}
+a:hover{text-decoration:underline}
+.badge{display:inline-block;padding:2px 8px;border-radius:9999px;font-size:.75rem;font-weight:600}
+.badge-house{background:#164e63;color:#67e8f9}
+.badge-apartment{background:#1e3a5f;color:#93c5fd}
+.badge-land{background:#365314;color:#a3e635}
+.badge-villa{background:#4c1d95;color:#c4b5fd}
+.badge-other{background:#374151;color:#9ca3af}
+.badge-below{background:#065f46;color:#6ee7b7}
+.badge-above{background:#7f1d1d;color:#fca5a5}
+.tabs{display:flex;gap:4px;margin-bottom:20px;border-bottom:1px solid #334155;padding-bottom:0}
+.tab{padding:10px 20px;cursor:pointer;border-radius:8px 8px 0 0;font-weight:500;font-size:.9rem;color:#94a3b8;transition:all .2s;border:1px solid transparent;border-bottom:none;margin-bottom:-1px}
+.tab:hover{color:#e2e8f0;background:#1e293b}
+.tab.active{background:#1e293b;color:#38bdf8;border-color:#334155;border-bottom-color:#1e293b}
+.tab-content{display:none}
+.tab-content.active{display:block}
+#pointPopup a.popup-link{display:inline-block;margin-top:12px;padding:8px 20px;background:#38bdf8;color:#0f172a;font-weight:600;border-radius:8px;text-decoration:none;transition:background .2s}
+#pointPopup a.popup-link:hover{background:#7dd3fc}
+.refresh-btn{background:linear-gradient(135deg,#38bdf8,#818cf8);color:#0f172a;border:none;padding:10px 24px;border-radius:8px;font-weight:700;font-size:.9rem;cursor:pointer;transition:all .2s;white-space:nowrap}
+.refresh-btn:hover{transform:scale(1.03);box-shadow:0 0 20px #38bdf844}
+.refresh-btn:disabled{opacity:.5;cursor:wait}
+@media(max-width:768px){.chart-grid{grid-template-columns:1fr}.stats-grid{grid-template-columns:repeat(2,1fr)}.header{padding:16px}.container{padding:16px}}
+</style>
+</head>
+<body>
+
+<div class="header">
+    <div>
+        <h1>HCMC Real Estate Dashboard</h1>
+        <div class="meta">Ho Chi Minh City Property Price Analysis</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:16px;">
+        <div class="meta" id="genTime"></div>
+        <button id="refreshBtn" class="refresh-btn" onclick="triggerRefresh()">&#x21bb; Refresh Data</button>
+        <div id="refreshStatus" style="display:none;font-size:.8rem;color:#fbbf24;max-width:350px;"></div>
+    </div>
+</div>
+
+<div class="container">
+    <div class="stats-grid" id="statsGrid"></div>
+    <div class="tabs" id="mainTabs">
+        <div class="tab active" data-tab="distribution">Distribution</div>
+        <div class="tab" data-tab="overview">Overview</div>
+        <div class="tab" data-tab="compare">District Compare</div>
+        <div class="tab" data-tab="cheapest">Cheapest Listings</div>
+        <div class="tab" data-tab="outliers">Outlier Detection</div>
+    </div>
+
+    <!-- Tab: Distribution -->
+    <div class="tab-content active" id="tab-distribution">
+        <div class="filters">
+            <label>District:</label>
+            <select id="scatterDistrictFilter"><option value="all">All Districts</option></select>
+            <label>Type:</label>
+            <select id="scatterTypeFilter">
+                <option value="all">All Types</option>
+                <option value="house">House</option>
+                <option value="apartment">Apartment</option>
+                <option value="land">Land</option>
+                <option value="villa">Villa</option>
+            </select>
+            <label>Source:</label>
+            <select id="scatterSourceFilter"><option value="all">All Sources</option></select>
+            <label>Color by:</label>
+            <select id="scatterColorBy">
+                <option value="district">District</option>
+                <option value="property_type">Property Type</option>
+                <option value="source">Source</option>
+            </select>
+            <label>X axis:</label>
+            <select id="scatterXAxis">
+                <option value="area_m2">Area (m²)</option>
+                <option value="price_billion">Price (tỷ)</option>
+            </select>
+            <label>Y axis:</label>
+            <select id="scatterYAxis">
+                <option value="price_per_m2">Price per m²</option>
+                <option value="price_billion">Price (tỷ)</option>
+                <option value="area_m2">Area (m²)</option>
+            </select>
+        </div>
+        <div class="filters" style="margin-top:-12px">
+            <label>Price (tỷ):</label>
+            <input type="number" id="scatterMinPrice" placeholder="Min" step="0.5" min="0" style="width:90px">
+            <span style="color:#64748b">—</span>
+            <input type="number" id="scatterMaxPrice" placeholder="Max" step="0.5" min="0" style="width:90px">
+            <label style="margin-left:8px">Area (m²):</label>
+            <input type="number" id="scatterMinArea" placeholder="Min" step="10" min="0" style="width:90px">
+            <span style="color:#64748b">—</span>
+            <input type="number" id="scatterMaxArea" placeholder="Max" step="10" min="0" style="width:90px">
+            <button onclick="renderScatter()" style="background:#334155;color:#e2e8f0;border:1px solid #475569;padding:8px 16px;border-radius:8px;cursor:pointer;font-size:.85rem">Apply</button>
+            <button onclick="clearRangeFilters()" style="background:transparent;color:#94a3b8;border:1px solid #475569;padding:8px 12px;border-radius:8px;cursor:pointer;font-size:.85rem">Clear</button>
+        </div>
+        <p style="color:#94a3b8;margin-bottom:8px;font-size:.85rem">
+            Each dot = one listing. <b>Click</b> = detail popup with link &nbsp;|&nbsp; <b>Double-click</b> = open listing directly.
+        </p>
+        <div class="chart-card full" style="position:relative">
+            <h2 id="scatterTitle">Price per m² vs Area — All Districts</h2>
+            <div style="position:relative;height:550px"><canvas id="chartScatter"></canvas></div>
+            <div id="scatterPointCount" style="text-align:right;font-size:.8rem;color:#64748b;margin-top:8px"></div>
+        </div>
+        <div id="pointPopup" style="display:none;position:fixed;z-index:999;background:#1e293b;border:1px solid #38bdf8;border-radius:12px;padding:20px;max-width:420px;box-shadow:0 8px 32px #00000088">
+            <div id="popupClose" style="position:absolute;top:8px;right:14px;cursor:pointer;color:#94a3b8;font-size:1.2rem">&times;</div>
+            <div id="popupContent"></div>
+        </div>
+    </div>
+
+    <!-- Tab: Overview -->
+    <div class="tab-content" id="tab-overview">
+        <div class="chart-grid">
+            <div class="chart-card full"><h2>Median Price per m² by District (VND)</h2><div class="chart-container"><canvas id="chartDistrictPrice"></canvas></div></div>
+            <div class="chart-card"><h2>Listings by Property Type</h2><div class="chart-container"><canvas id="chartPropType"></canvas></div></div>
+            <div class="chart-card"><h2>Listings by Source</h2><div class="chart-container"><canvas id="chartSource"></canvas></div></div>
+            <div class="chart-card full"><h2>Price Range by District</h2><div class="chart-container"><canvas id="chartBoxPlot"></canvas></div></div>
+        </div>
+    </div>
+
+    <!-- Tab: District Compare -->
+    <div class="tab-content" id="tab-compare">
+        <div class="filters">
+            <label>Compare:</label>
+            <select id="compareDistrict1"></select>
+            <span style="color:#64748b">vs</span>
+            <select id="compareDistrict2"></select>
+        </div>
+        <div class="chart-grid"><div class="chart-card full"><h2>Side-by-Side Comparison</h2><div class="chart-container"><canvas id="chartCompare"></canvas></div></div></div>
+        <div id="compareTable"></div>
+    </div>
+
+    <!-- Tab: Cheapest Listings -->
+    <div class="tab-content" id="tab-cheapest">
+        <div class="filters">
+            <label>District:</label>
+            <select id="cheapDistrictFilter"><option value="all">All Districts</option></select>
+            <label>Type:</label>
+            <select id="cheapTypeFilter"><option value="all">All Types</option><option value="house">House</option><option value="apartment">Apartment</option><option value="land">Land</option><option value="villa">Villa</option></select>
+            <label>Max Price:</label>
+            <input type="number" id="cheapMaxPrice" placeholder="e.g. 5 (tỷ)" step="0.5" style="width:120px">
+        </div>
+        <div class="table-wrapper">
+            <table id="cheapTable">
+                <thead><tr><th data-sort="district">District</th><th data-sort="title">Title</th><th data-sort="price_billion">Price (tỷ)</th><th data-sort="area_m2">Area (m²)</th><th data-sort="price_per_m2">Price/m²</th><th data-sort="property_type">Type</th><th data-sort="source">Source</th></tr></thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Tab: Outliers -->
+    <div class="tab-content" id="tab-outliers">
+        <p style="color:#94a3b8;margin-bottom:16px">Properties with price/m² outside 1.5x IQR for their district.</p>
+        <div class="table-wrapper">
+            <table id="outlierTable">
+                <thead><tr><th>District</th><th>Title</th><th>Price (tỷ)</th><th>Price/m²</th><th>Status</th></tr></thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+const DATA = %%DATA_JSON%%;
+
+// ====== HELPERS ======
+function fmtM2(v) { if (!v) return 'N/A'; return (v/1e6).toFixed(1)+' tr/m²'; }
+function fmtBillion(v) { if (v==null) return 'N/A'; return v>=1 ? v.toFixed(1)+' tỷ' : (v*1000).toFixed(0)+' tr'; }
+function fmtArea(v) { if (!v) return 'N/A'; return v.toFixed(0)+' m²'; }
+function badge(type) {
+    var labels={house:'Nhà',apartment:'Căn hộ',land:'Đất',villa:'Biệt thự',other:'Khác'};
+    return '<span class="badge badge-'+type+'">'+(labels[type]||type)+'</span>';
+}
+
+// ====== REFRESH ======
+function triggerRefresh() {
+    var btn=document.getElementById('refreshBtn'), st=document.getElementById('refreshStatus');
+    fetch('/api/refresh').then(function(r){return r.json()}).then(function(data){
+        if(data.status==='already_running'){st.style.display='inline';st.textContent='Refresh already running...';return;}
+        btn.disabled=true;btn.textContent='Crawling...';
+        st.style.display='inline';st.textContent='Fetching fresh data from sources...';
+        var poll=setInterval(function(){
+            fetch('/api/status').then(function(r){return r.json()}).then(function(s){
+                if(!s.refreshing){clearInterval(poll);st.textContent='Done! Reloading...';setTimeout(function(){window.location.reload()},1000);}
+            }).catch(function(){clearInterval(poll)});
+        },2000);
+    }).catch(function(){
+        st.style.display='inline';
+        st.innerHTML='To enable live refresh, run: <code style="background:#334155;padding:2px 8px;border-radius:4px">python server.py</code> then open <code style="background:#334155;padding:2px 8px;border-radius:4px">http://localhost:8686</code>';
+    });
+}
+function clearRangeFilters(){
+    document.getElementById('scatterMinPrice').value='';document.getElementById('scatterMaxPrice').value='';
+    document.getElementById('scatterMinArea').value='';document.getElementById('scatterMaxArea').value='';
+    renderScatter();
+}
+
+// ====== TABS ======
+document.querySelectorAll('.tab').forEach(function(tab){
+    tab.addEventListener('click',function(){
+        document.querySelectorAll('.tab').forEach(function(t){t.classList.remove('active')});
+        document.querySelectorAll('.tab-content').forEach(function(c){c.classList.remove('active')});
+        tab.classList.add('active');
+        document.getElementById('tab-'+tab.dataset.tab).classList.add('active');
+    });
+});
+
+// ====== RENDER ======
+function render() {
+    document.getElementById('genTime').textContent='Generated: '+DATA.generated_at;
+    var stats=[
+        {value:DATA.total_listings,label:'Total Listings'},
+        {value:DATA.total_districts,label:'Districts Covered'},
+        {value:Object.keys(DATA.sources).length,label:'Data Sources'},
+        {value:fmtBillion(DATA.median_price),label:'Median Price'},
+        {value:fmtBillion(DATA.avg_price),label:'Average Price'}
+    ];
+    document.getElementById('statsGrid').innerHTML=stats.map(function(s){
+        return '<div class="stat-card"><div class="value">'+s.value+'</div><div class="label">'+s.label+'</div></div>';
+    }).join('');
+    renderDistrictChart();renderPropTypeChart();renderSourceChart();renderBoxPlot();
+    populateFilters();renderCheapestTable();renderOutlierTable();initScatter();
+}
+
+var COLORS=['#38bdf8','#818cf8','#f472b6','#34d399','#fbbf24','#fb923c','#a78bfa','#22d3ee','#f87171','#4ade80'];
+
+function renderDistrictChart() {
+    var ds=DATA.district_stats.sort(function(a,b){return b.median_price_m2-a.median_price_m2});
+    new Chart(document.getElementById('chartDistrictPrice'),{type:'bar',data:{
+        labels:ds.map(function(d){return d.district.replace('Quận ','Q').replace('Huyện ','H.').replace('Thành phố ','')}),
+        datasets:[
+            {label:'Median Price/m²',data:ds.map(function(d){return d.median_price_m2}),backgroundColor:'#38bdf8',borderRadius:4},
+            {label:'Average Price/m²',data:ds.map(function(d){return d.avg_price_m2}),backgroundColor:'#818cf844',borderColor:'#818cf8',borderWidth:1,borderRadius:4}
+        ]},options:{responsive:true,maintainAspectRatio:false,plugins:{tooltip:{callbacks:{label:function(ctx){return ctx.dataset.label+': '+fmtM2(ctx.raw)}}}},scales:{y:{ticks:{callback:function(v){return (v/1e6).toFixed(0)+'tr'},color:'#94a3b8'},grid:{color:'#1e293b'}},x:{ticks:{color:'#94a3b8',maxRotation:45},grid:{display:false}}}}
+    });
+}
+function renderPropTypeChart() {
+    var ts=DATA.type_stats,lb={house:'Nhà riêng',apartment:'Căn hộ',land:'Đất nền',villa:'Biệt thự',other:'Khác'};
+    new Chart(document.getElementById('chartPropType'),{type:'doughnut',data:{labels:ts.map(function(t){return lb[t.property_type]||t.property_type}),datasets:[{data:ts.map(function(t){return t.count}),backgroundColor:COLORS}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{color:'#94a3b8'}}}}});
+}
+function renderSourceChart() {
+    var ss=DATA.source_stats;
+    new Chart(document.getElementById('chartSource'),{type:'doughnut',data:{labels:ss.map(function(s){return s.source}),datasets:[{data:ss.map(function(s){return s.count}),backgroundColor:['#38bdf8','#818cf8','#f472b6','#34d399']}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{color:'#94a3b8'}}}}});
+}
+function renderBoxPlot() {
+    var bd=DATA.box_data,dists=Object.keys(bd).sort(function(a,b){return bd[b].median-bd[a].median});
+    var lb=dists.map(function(d){return d.replace('Quận ','Q').replace('Huyện ','H.').replace('Thành phố ','')});
+    new Chart(document.getElementById('chartBoxPlot'),{type:'bar',data:{labels:lb,datasets:[
+        {label:'Min',data:dists.map(function(d){return bd[d].min}),backgroundColor:'#334155',borderRadius:2},
+        {label:'Q1-Med',data:dists.map(function(d){return bd[d].median-bd[d].q1}),backgroundColor:'#38bdf866',borderRadius:2},
+        {label:'Med-Q3',data:dists.map(function(d){return bd[d].q3-bd[d].median}),backgroundColor:'#818cf866',borderRadius:2},
+        {label:'Q3-Max',data:dists.map(function(d){return bd[d].max-bd[d].q3}),backgroundColor:'#33415566',borderRadius:2}
+    ]},options:{responsive:true,maintainAspectRatio:false,plugins:{tooltip:{callbacks:{afterBody:function(items){var idx=items[0].dataIndex,d=dists[idx];return 'Min: '+fmtM2(bd[d].min)+'\nQ1: '+fmtM2(bd[d].q1)+'\nMedian: '+fmtM2(bd[d].median)+'\nQ3: '+fmtM2(bd[d].q3)+'\nMax: '+fmtM2(bd[d].max)}}},legend:{display:false}},scales:{x:{stacked:true,ticks:{color:'#94a3b8',maxRotation:45},grid:{display:false}},y:{stacked:true,ticks:{callback:function(v){return (v/1e6).toFixed(0)+'tr'},color:'#94a3b8'},grid:{color:'#1e293b'}}}}});
+}
+
+// ====== FILTERS & TABLES ======
+function populateFilters() {
+    var districts=DATA.district_stats.map(function(d){return d.district}).sort();
+    var cf=document.getElementById('cheapDistrictFilter');
+    districts.forEach(function(d){var o=document.createElement('option');o.value=d;o.textContent=d;cf.appendChild(o)});
+    var c1=document.getElementById('compareDistrict1'),c2=document.getElementById('compareDistrict2');
+    districts.forEach(function(d,i){
+        var o1=document.createElement('option');o1.value=d;o1.textContent=d;
+        var o2=document.createElement('option');o2.value=d;o2.textContent=d;
+        if(i===0)o1.selected=true;if(i===1)o2.selected=true;
+        c1.appendChild(o1);c2.appendChild(o2);
+    });
+    c1.addEventListener('change',renderCompare);c2.addEventListener('change',renderCompare);renderCompare();
+    document.getElementById('cheapDistrictFilter').addEventListener('change',renderCheapestTable);
+    document.getElementById('cheapTypeFilter').addEventListener('change',renderCheapestTable);
+    document.getElementById('cheapMaxPrice').addEventListener('input',renderCheapestTable);
+}
+
+var compareChart=null;
+function renderCompare() {
+    var d1=document.getElementById('compareDistrict1').value,d2=document.getElementById('compareDistrict2').value;
+    var s1=DATA.district_stats.find(function(d){return d.district===d1}),s2=DATA.district_stats.find(function(d){return d.district===d2});
+    if(!s1||!s2)return;
+    if(compareChart)compareChart.destroy();
+    var metrics=['median_price_m2','avg_price_m2','avg_price','avg_area','count'];
+    var labels=['Median đ/m²','Avg đ/m²','Avg Price (tỷ)','Avg Area (m²)','Listings'];
+    var mv=metrics.map(function(m){return Math.max(s1[m]||1,s2[m]||1)});
+    compareChart=new Chart(document.getElementById('chartCompare'),{type:'radar',data:{labels:labels,datasets:[
+        {label:d1,data:metrics.map(function(m,i){return((s1[m]||0)/mv[i]*100).toFixed(1)}),borderColor:'#38bdf8',backgroundColor:'#38bdf822',pointBackgroundColor:'#38bdf8'},
+        {label:d2,data:metrics.map(function(m,i){return((s2[m]||0)/mv[i]*100).toFixed(1)}),borderColor:'#f472b6',backgroundColor:'#f472b622',pointBackgroundColor:'#f472b6'}
+    ]},options:{responsive:true,maintainAspectRatio:false,scales:{r:{ticks:{display:false},grid:{color:'#334155'},pointLabels:{color:'#94a3b8'}}},plugins:{legend:{labels:{color:'#e2e8f0'}}}}});
+    document.getElementById('compareTable').innerHTML='<div class="table-wrapper" style="margin-top:20px"><table><thead><tr><th>Metric</th><th>'+d1+'</th><th>'+d2+'</th><th>Diff</th></tr></thead><tbody>'+
+        '<tr><td>Median đ/m²</td><td>'+fmtM2(s1.median_price_m2)+'</td><td>'+fmtM2(s2.median_price_m2)+'</td><td>'+((s1.median_price_m2/s2.median_price_m2-1)*100).toFixed(1)+'%</td></tr>'+
+        '<tr><td>Avg Price</td><td>'+fmtBillion(s1.avg_price)+'</td><td>'+fmtBillion(s2.avg_price)+'</td><td>'+((s1.avg_price/s2.avg_price-1)*100).toFixed(1)+'%</td></tr>'+
+        '<tr><td>Avg Area</td><td>'+fmtArea(s1.avg_area)+'</td><td>'+fmtArea(s2.avg_area)+'</td><td>'+((s1.avg_area/s2.avg_area-1)*100).toFixed(1)+'%</td></tr>'+
+        '<tr><td>Listings</td><td>'+s1.count+'</td><td>'+s2.count+'</td><td>'+(s1.count-s2.count)+'</td></tr></tbody></table></div>';
+}
+
+function renderCheapestTable() {
+    var distF=document.getElementById('cheapDistrictFilter').value;
+    var typeF=document.getElementById('cheapTypeFilter').value;
+    var maxP=parseFloat(document.getElementById('cheapMaxPrice').value)||Infinity;
+    var items=DATA.cheapest_listings.filter(function(l){return distF==='all'||l.district===distF}).filter(function(l){return typeF==='all'||l.property_type===typeF}).filter(function(l){return l.price_billion<=maxP}).sort(function(a,b){return a.price_billion-b.price_billion});
+    document.querySelector('#cheapTable tbody').innerHTML=items.slice(0,100).map(function(l){
+        return '<tr><td>'+l.district+'</td><td>'+(l.url?'<a href="'+l.url+'" target="_blank">'+l.title+'</a>':l.title)+'</td><td>'+fmtBillion(l.price_billion)+'</td><td>'+fmtArea(l.area_m2)+'</td><td>'+fmtM2(l.price_per_m2)+'</td><td>'+badge(l.property_type)+'</td><td>'+l.source+'</td></tr>';
+    }).join('');
+}
+
+function renderOutlierTable() {
+    document.querySelector('#outlierTable tbody').innerHTML=DATA.outliers.map(function(o){
+        return '<tr><td>'+o.district+'</td><td>'+o.title+'</td><td>'+fmtBillion(o.price_billion)+'</td><td>'+fmtM2(o.price_per_m2)+'</td><td><span class="badge badge-'+o.type+'">'+(o.type==='below'?'↓ Potential Deal':'↑ Overpriced')+'</span></td></tr>';
+    }).join('');
+}
+
+// ====== TABLE SORTING ======
+document.querySelectorAll('th[data-sort]').forEach(function(th){
+    th.addEventListener('click',function(){
+        var table=th.closest('table'),tbody=table.querySelector('tbody'),rows=Array.from(tbody.rows),col=th.cellIndex;
+        var asc=!th.classList.contains('sorted-asc');
+        table.querySelectorAll('th').forEach(function(h){h.classList.remove('sorted-asc','sorted-desc')});
+        th.classList.add(asc?'sorted-asc':'sorted-desc');
+        rows.sort(function(a,b){
+            var va=a.cells[col].textContent.trim(),vb=b.cells[col].textContent.trim();
+            var na=parseFloat(va.replace(/[^\d.-]/g,'')),nb=parseFloat(vb.replace(/[^\d.-]/g,''));
+            if(!isNaN(na)&&!isNaN(nb))return asc?na-nb:nb-na;
+            return asc?va.localeCompare(vb,'vi'):vb.localeCompare(va,'vi');
+        });
+        rows.forEach(function(r){tbody.appendChild(r)});
+    });
+});
+
+// ====== SCATTER PLOT ======
+var DISTRICT_COLORS={};
+var TYPE_COLORS={house:'#67e8f9',apartment:'#93c5fd',land:'#a3e635',villa:'#c4b5fd',other:'#9ca3af'};
+var SOURCE_COLORS={'chotot.com':'#38bdf8','batdongsan.com.vn':'#818cf8','muaban.net':'#f472b6'};
+(function(){
+    var palette=['#38bdf8','#818cf8','#f472b6','#34d399','#fbbf24','#fb923c','#a78bfa','#22d3ee','#f87171','#4ade80','#e879f9','#facc15','#2dd4bf','#fb7185','#a3e635','#c084fc','#67e8f9','#fca5a5','#86efac','#fcd34d','#c4b5fd','#6ee7b7'];
+    var dists=[...new Set(DATA.all_points.map(function(p){return p.district}))].sort();
+    dists.forEach(function(d,i){DISTRICT_COLORS[d]=palette[i%palette.length]});
+})();
+
+var scatterChart=null, scatterFiltered=[];
+
+function getColorMap(colorBy){
+    if(colorBy==='district')return DISTRICT_COLORS;
+    if(colorBy==='property_type')return TYPE_COLORS;
+    if(colorBy==='source')return SOURCE_COLORS;
+    return {};
+}
+
+function initScatter(){
+    var districts=[...new Set(DATA.all_points.map(function(p){return p.district}))].sort();
+    var sdf=document.getElementById('scatterDistrictFilter');
+    districts.forEach(function(d){var o=document.createElement('option');o.value=d;o.textContent=d;sdf.appendChild(o)});
+    var sources=[...new Set(DATA.all_points.map(function(p){return p.source}))].sort();
+    var ssf=document.getElementById('scatterSourceFilter');
+    sources.forEach(function(s){var o=document.createElement('option');o.value=s;o.textContent=s;ssf.appendChild(o)});
+
+    ['scatterDistrictFilter','scatterTypeFilter','scatterSourceFilter','scatterColorBy','scatterXAxis','scatterYAxis'].forEach(function(id){
+        document.getElementById(id).addEventListener('change',renderScatter);
+    });
+    ['scatterMinPrice','scatterMaxPrice','scatterMinArea','scatterMaxArea'].forEach(function(id){
+        document.getElementById(id).addEventListener('keydown',function(e){if(e.key==='Enter')renderScatter()});
+    });
+
+    document.getElementById('popupClose').addEventListener('click',function(){document.getElementById('pointPopup').style.display='none'});
+    document.addEventListener('click',function(e){
+        var popup=document.getElementById('pointPopup');
+        if(popup.style.display==='block'&&!popup.contains(e.target)&&e.target.id!=='chartScatter')popup.style.display='none';
+    });
+
+    // Double-click to open listing directly
+    document.getElementById('chartScatter').addEventListener('dblclick',function(evt){
+        if(!scatterChart)return;
+        var elements=scatterChart.getElementsAtEventForMode(evt,'nearest',{intersect:true},false);
+        if(!elements.length)return;
+        var el=elements[0];
+        var rawPt=scatterChart.data.datasets[el.datasetIndex].data[el.index];
+        var p=scatterFiltered[rawPt._idx];
+        if(p&&p.url)window.open(p.url,'_blank');
+    });
+
+    renderScatter();
+}
+
+function renderScatter(){
+    var distF=document.getElementById('scatterDistrictFilter').value;
+    var typeF=document.getElementById('scatterTypeFilter').value;
+    var srcF=document.getElementById('scatterSourceFilter').value;
+    var colorBy=document.getElementById('scatterColorBy').value;
+    var xKey=document.getElementById('scatterXAxis').value;
+    var yKey=document.getElementById('scatterYAxis').value;
+
+    var minPrice=parseFloat(document.getElementById('scatterMinPrice').value)||0;
+    var maxPrice=parseFloat(document.getElementById('scatterMaxPrice').value)||Infinity;
+    var minArea=parseFloat(document.getElementById('scatterMinArea').value)||0;
+    var maxArea=parseFloat(document.getElementById('scatterMaxArea').value)||Infinity;
+
+    scatterFiltered=DATA.all_points
+        .filter(function(p){return distF==='all'||p.district===distF})
+        .filter(function(p){return typeF==='all'||p.property_type===typeF})
+        .filter(function(p){return srcF==='all'||p.source===srcF})
+        .filter(function(p){return p[xKey]&&p[yKey]&&p[xKey]>0&&p[yKey]>0})
+        .filter(function(p){return p.price_billion>=minPrice&&p.price_billion<=maxPrice})
+        .filter(function(p){return !p.area_m2||(p.area_m2>=minArea&&p.area_m2<=maxArea)});
+
+    var axLb={area_m2:'Area (m²)',price_billion:'Price (tỷ)',price_per_m2:'Price per m²'};
+    var distLabel=distF==='all'?'All Districts':distF;
+    document.getElementById('scatterTitle').textContent=axLb[yKey]+' vs '+axLb[xKey]+' — '+distLabel+' ('+scatterFiltered.length+' listings)';
+    document.getElementById('scatterPointCount').textContent=scatterFiltered.length+' data points shown';
+
+    var colorMap=getColorMap(colorBy), groups={};
+    scatterFiltered.forEach(function(p,idx){
+        var key=p[colorBy]||'other';
+        if(!groups[key])groups[key]=[];
+        groups[key].push({x:p[xKey],y:p[yKey],_idx:idx});
+    });
+
+    var datasets=Object.entries(groups).map(function(entry){
+        var key=entry[0],points=entry[1];
+        return {
+            label:key.replace('Quận ','Q').replace('Huyện ','H.').replace('Thành phố ',''),
+            data:points,
+            backgroundColor:(colorMap[key]||'#94a3b8')+'AA',
+            borderColor:colorMap[key]||'#94a3b8',
+            borderWidth:1,pointRadius:5,pointHoverRadius:9,pointHoverBorderWidth:2,pointHoverBorderColor:'#ffffff'
+        };
+    });
+
+    if(scatterChart)scatterChart.destroy();
+    var yIsPM2=yKey==='price_per_m2', xIsArea=xKey==='area_m2';
+
+    scatterChart=new Chart(document.getElementById('chartScatter'),{
+        type:'scatter',
+        data:{datasets:datasets},
+        options:{
+            responsive:true,maintainAspectRatio:false,animation:{duration:300},
+            plugins:{
+                tooltip:{enabled:true,callbacks:{
+                    label:function(ctx){
+                        var i=ctx.raw._idx,p=scatterFiltered[i];if(!p)return'';
+                        return [
+                            p.title.substring(0,50)+(p.title.length>50?'...':''),
+                            'Price: '+fmtBillion(p.price_billion)+' | Area: '+fmtArea(p.area_m2),
+                            'Price/m²: '+fmtM2(p.price_per_m2),
+                            p.district+' — '+p.source,
+                            p.url?'Click=details | Dbl-click=open link':''
+                        ].filter(Boolean);
+                    }
+                },backgroundColor:'#1e293b',titleColor:'#38bdf8',bodyColor:'#e2e8f0',borderColor:'#334155',borderWidth:1,padding:12,displayColors:false},
+                legend:{display:true,position:'bottom',labels:{color:'#94a3b8',usePointStyle:true,pointStyle:'circle',padding:12,font:{size:11}}}
+            },
+            scales:{
+                x:{title:{display:true,text:axLb[xKey],color:'#94a3b8'},ticks:{color:'#94a3b8',callback:function(v){if(xIsArea)return v+'m²';if(xKey==='price_billion')return v.toFixed(1)+' tỷ';return(v/1e6).toFixed(0)+'tr'}},grid:{color:'#1e293b'}},
+                y:{title:{display:true,text:axLb[yKey],color:'#94a3b8'},ticks:{color:'#94a3b8',callback:function(v){if(yIsPM2)return(v/1e6).toFixed(0)+' tr/m²';if(yKey==='price_billion')return v.toFixed(1)+' tỷ';return v+'m²'}},grid:{color:'#1e293b'}}
+            },
+            onClick:function(evt,elements){
+                if(!elements.length)return;
+                var el=elements[0],rawPt=scatterChart.data.datasets[el.datasetIndex].data[el.index];
+                var p=scatterFiltered[rawPt._idx];if(!p)return;
+                showPointPopup(evt,p);
+            }
+        }
+    });
+}
+
+function showPointPopup(evt,p){
+    var popup=document.getElementById('pointPopup'),content=document.getElementById('popupContent');
+    content.innerHTML=
+        '<div style="font-weight:700;font-size:1rem;color:#f1f5f9;margin-bottom:10px;line-height:1.4">'+p.title+'</div>'+
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 16px;font-size:.9rem">'+
+        '<div><span style="color:#64748b">Price:</span> <strong style="color:#38bdf8">'+fmtBillion(p.price_billion)+'</strong></div>'+
+        '<div><span style="color:#64748b">Area:</span> <strong>'+fmtArea(p.area_m2)+'</strong></div>'+
+        '<div><span style="color:#64748b">Price/m²:</span> <strong style="color:#fbbf24">'+fmtM2(p.price_per_m2)+'</strong></div>'+
+        '<div><span style="color:#64748b">Type:</span> '+badge(p.property_type)+'</div>'+
+        '<div><span style="color:#64748b">District:</span> '+p.district+'</div>'+
+        '<div><span style="color:#64748b">Source:</span> '+p.source+'</div>'+
+        '</div>'+
+        (p.address?'<div style="color:#64748b;font-size:.85rem;margin-top:8px">'+p.address+'</div>':'')+
+        (p.url?'<a class="popup-link" href="'+p.url+'" target="_blank" rel="noopener">Open Original Listing &rarr;</a>':'<div style="color:#64748b;font-size:.85rem;margin-top:12px">(No direct link available)</div>');
+    var x=evt.native.clientX,y=evt.native.clientY;
+    popup.style.display='block';
+    var pw=popup.offsetWidth,ph=popup.offsetHeight,wx=window.innerWidth,wy=window.innerHeight;
+    popup.style.left=Math.min(x+16,wx-pw-20)+'px';
+    popup.style.top=Math.min(y-20,wy-ph-20)+'px';
+}
+
+// ====== INIT ======
+render();
+</script>
+</body>
+</html>
