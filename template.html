@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>HCMC Real Estate Dashboard</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/hammer.js/2.0.8/hammer.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-zoom/2.0.1/chartjs-plugin-zoom.min.js"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:#0f172a;color:#e2e8f0;line-height:1.6}
@@ -126,10 +128,10 @@ a:hover{text-decoration:underline}
             <input type="number" id="scatterMaxArea" placeholder="Max" step="10" min="0" style="width:90px">
             <button onclick="renderScatter()" style="background:#334155;color:#e2e8f0;border:1px solid #475569;padding:8px 16px;border-radius:8px;cursor:pointer;font-size:.85rem">Apply</button>
             <button onclick="clearRangeFilters()" style="background:transparent;color:#94a3b8;border:1px solid #475569;padding:8px 12px;border-radius:8px;cursor:pointer;font-size:.85rem">Clear</button>
-            <label style="display:inline-flex;align-items:center;gap:6px;margin-left:12px;cursor:pointer"><input type="checkbox" id="scatterLogScale" onchange="renderScatter()" style="accent-color:#38bdf8;width:16px;height:16px"> <span style="color:#94a3b8;font-size:.85rem">Log Scale</span></label>
+            <button onclick="resetZoom()" style="background:#1e40af;color:#e2e8f0;border:1px solid #3b82f6;padding:8px 16px;border-radius:8px;cursor:pointer;font-size:.85rem">Reset Zoom</button>
         </div>
         <p style="color:#94a3b8;margin-bottom:8px;font-size:.85rem">
-            Each dot = one listing. <b>Click</b> = detail popup with link &nbsp;|&nbsp; <b>Double-click</b> = open listing directly.
+            Each dot = one listing. <b>Scroll</b> = zoom in/out &nbsp;|&nbsp; <b>Drag</b> = pan &nbsp;|&nbsp; <b>Click</b> = detail popup &nbsp;|&nbsp; <b>Dbl-click</b> = open listing.
         </p>
         <div class="chart-card full" style="position:relative">
             <h2 id="scatterTitle">Price per m² vs Area — All Districts</h2>
@@ -228,6 +230,7 @@ function clearRangeFilters(){
     document.getElementById('scatterMinArea').value='';document.getElementById('scatterMaxArea').value='';
     renderScatter();
 }
+function resetZoom(){if(scatterChart)scatterChart.resetZoom();}
 
 // ====== TABS ======
 document.querySelectorAll('.tab').forEach(function(tab){
@@ -477,16 +480,13 @@ function renderScatter(){
                         ].filter(Boolean);
                     }
                 },backgroundColor:'#1e293b',titleColor:'#38bdf8',bodyColor:'#e2e8f0',borderColor:'#334155',borderWidth:1,padding:12,displayColors:false},
-                legend:{display:true,position:'bottom',labels:{color:'#94a3b8',usePointStyle:true,pointStyle:'circle',padding:12,font:{size:11}}}
+                legend:{display:true,position:'bottom',labels:{color:'#94a3b8',usePointStyle:true,pointStyle:'circle',padding:12,font:{size:11}}},
+                zoom:{zoom:{wheel:{enabled:true},pinch:{enabled:true},mode:'xy'},pan:{enabled:true,mode:'xy'},limits:{x:{minRange:1},y:{minRange:1}}}
             },
-            scales:(function(){
-                var useLog=document.getElementById('scatterLogScale').checked;
-                var scaleType=useLog?'logarithmic':'linear';
-                return {
-                x:{type:scaleType,title:{display:true,text:axLb[xKey]+(useLog?' (log)':''),color:'#94a3b8'},ticks:{color:'#94a3b8',callback:function(v){if(xIsArea)return v+'m²';if(xKey==='price_billion')return v.toFixed(1)+' tỷ';return(v/1e6).toFixed(0)+'tr'}},grid:{color:'#1e293b'},min:useLog?undefined:undefined},
-                y:{type:scaleType,title:{display:true,text:axLb[yKey]+(useLog?' (log)':''),color:'#94a3b8'},ticks:{color:'#94a3b8',callback:function(v){if(yIsPM2)return(v/1e6).toFixed(0)+' tr/m²';if(yKey==='price_billion')return v.toFixed(1)+' tỷ';return v+'m²'}},grid:{color:'#1e293b'}}
-                };
-            })(),
+            scales:{
+                x:{title:{display:true,text:axLb[xKey],color:'#94a3b8'},ticks:{color:'#94a3b8',callback:function(v){if(xIsArea)return v+'m²';if(xKey==='price_billion')return v.toFixed(1)+' tỷ';return(v/1e6).toFixed(0)+'tr'}},grid:{color:'#1e293b'}},
+                y:{title:{display:true,text:axLb[yKey],color:'#94a3b8'},ticks:{color:'#94a3b8',callback:function(v){if(yIsPM2)return(v/1e6).toFixed(0)+' tr/m²';if(yKey==='price_billion')return v.toFixed(1)+' tỷ';return v+'m²'}},grid:{color:'#1e293b'}}
+            },
             onClick:function(evt,elements){
                 if(!elements.length)return;
                 var el=elements[0],rawPt=scatterChart.data.datasets[el.datasetIndex].data[el.index];
