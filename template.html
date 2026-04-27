@@ -129,6 +129,7 @@ a:hover{text-decoration:underline}
             <button onclick="renderScatter()" style="background:#334155;color:#e2e8f0;border:1px solid #475569;padding:8px 16px;border-radius:8px;cursor:pointer;font-size:.85rem">Apply</button>
             <button onclick="clearRangeFilters()" style="background:transparent;color:#94a3b8;border:1px solid #475569;padding:8px 12px;border-radius:8px;cursor:pointer;font-size:.85rem">Clear</button>
             <button onclick="resetZoom()" style="background:#1e40af;color:#e2e8f0;border:1px solid #3b82f6;padding:8px 16px;border-radius:8px;cursor:pointer;font-size:.85rem">Reset Zoom</button>
+            <label style="display:inline-flex;align-items:center;gap:6px;margin-left:12px;cursor:pointer"><input type="checkbox" id="scatterLogScale" onchange="renderScatter()" style="accent-color:#38bdf8;width:16px;height:16px"> <span style="color:#94a3b8;font-size:.85rem">Log Scale</span></label>
         </div>
         <p style="color:#94a3b8;margin-bottom:8px;font-size:.85rem">
             Each dot = one listing. <b>Scroll</b> = zoom in/out &nbsp;|&nbsp; <b>Drag</b> = pan &nbsp;|&nbsp; <b>Click</b> = detail popup &nbsp;|&nbsp; <b>Dbl-click</b> = open listing.
@@ -483,10 +484,14 @@ function renderScatter(){
                 legend:{display:true,position:'bottom',labels:{color:'#94a3b8',usePointStyle:true,pointStyle:'circle',padding:12,font:{size:11}}},
                 zoom:{zoom:{wheel:{enabled:true},pinch:{enabled:true},mode:'xy'},pan:{enabled:true,mode:'xy'},limits:{x:{minRange:1},y:{minRange:1}}}
             },
-            scales:{
-                x:{title:{display:true,text:axLb[xKey],color:'#94a3b8'},ticks:{color:'#94a3b8',callback:function(v){if(xIsArea)return v+'m²';if(xKey==='price_billion')return v.toFixed(1)+' tỷ';return(v/1e6).toFixed(0)+'tr'}},grid:{color:'#1e293b'}},
-                y:{title:{display:true,text:axLb[yKey],color:'#94a3b8'},ticks:{color:'#94a3b8',callback:function(v){if(yIsPM2)return(v/1e6).toFixed(0)+' tr/m²';if(yKey==='price_billion')return v.toFixed(1)+' tỷ';return v+'m²'}},grid:{color:'#1e293b'}}
-            },
+            scales:(function(){
+                var useLog=document.getElementById('scatterLogScale').checked;
+                var st=useLog?'logarithmic':'linear';
+                return {
+                    x:{type:st,title:{display:true,text:axLb[xKey]+(useLog?' (log)':''),color:'#94a3b8'},ticks:{color:'#94a3b8',callback:function(v){if(xIsArea)return v+'m²';if(xKey==='price_billion')return v.toFixed(1)+' tỷ';return(v/1e6).toFixed(0)+'tr'}},grid:{color:'#1e293b'}},
+                    y:{type:st,title:{display:true,text:axLb[yKey]+(useLog?' (log)':''),color:'#94a3b8'},ticks:{color:'#94a3b8',callback:function(v){if(yIsPM2)return(v/1e6).toFixed(0)+' tr/m²';if(yKey==='price_billion')return v.toFixed(1)+' tỷ';return v+'m²'}},grid:{color:'#1e293b'}}
+                };
+            })(),
             onClick:function(evt,elements){
                 if(!elements.length)return;
                 var el=elements[0],rawPt=scatterChart.data.datasets[el.datasetIndex].data[el.index];
