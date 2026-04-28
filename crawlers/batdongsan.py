@@ -8,7 +8,7 @@ import json
 import time
 from bs4 import BeautifulSoup
 from crawlers.base import BaseCrawler
-from config import BDS_DISTRICT_SLUGS
+from config import BDS_DISTRICT_SLUGS, BDS_BINH_DUONG_SLUGS, BDS_NHA_TRANG_SLUGS
 from utils import parse_price, parse_area, classify_property_type
 
 # Try to import playwright
@@ -31,8 +31,17 @@ class BatDongSanCrawler(BaseCrawler):
             print("  [!] Playwright not installed. Run: pip install playwright && playwright install chromium")
             print("  [!] Batdongsan requires a headless browser (JS-rendered listings)")
 
-    def _build_url(self, district_slug, page=1):
-        url = f"{self.BASE_URL}/ban-nha-dat-tp-ho-chi-minh/{district_slug}"
+    # Merge all slug maps and map each to its province URL segment
+    ALL_SLUGS = {}
+    for d, s in BDS_DISTRICT_SLUGS.items():
+        ALL_SLUGS[d] = ("tp-ho-chi-minh", s)
+    for d, s in BDS_BINH_DUONG_SLUGS.items():
+        ALL_SLUGS[d] = ("binh-duong", s)
+    for d, s in BDS_NHA_TRANG_SLUGS.items():
+        ALL_SLUGS[d] = ("khanh-hoa", s)
+
+    def _build_url(self, province_slug, district_slug, page=1):
+        url = f"{self.BASE_URL}/ban-nha-dat-{province_slug}/{district_slug}"
         if page > 1:
             url += f"/p{page}"
         return url
@@ -120,7 +129,7 @@ class BatDongSanCrawler(BaseCrawler):
         except Exception:
             return None
 
-    def _crawl_with_playwright(self, district_name, slug, max_pages):
+    def _crawl_with_playwright(self, district_name, province_slug, district_slug, max_pages):
         """Use Playwright headless browser to render and scrape listings."""
         listings = []
         try:
@@ -133,7 +142,7 @@ class BatDongSanCrawler(BaseCrawler):
                 page = context.new_page()
 
                 for pg in range(1, max_pages + 1):
-                    url = self._build_url(slug, pg)
+                    url = self._build_url(province_slug, district_slug, pg)
                     try:
                         page.goto(url, wait_until="networkidle", timeout=30000)
                         # Wait for listing cards to appear
@@ -180,13 +189,13 @@ class BatDongSanCrawler(BaseCrawler):
 
     def crawl_district(self, district_name, max_pages=3):
         """Crawl listings for a district from batdongsan.com.vn"""
-        slug = BDS_DISTRICT_SLUGS.get(district_name)
-        if not slug:
+        entry = self.ALL_SLUGS.get(district_name)
+        if not entry:
             print(f"  [!] No slug for {district_name}")
             return []
 
+        province_slug, district_slug = entry
         if HAS_PLAYWRIGHT:
-            return self._crawl_with_playwright(district_name, slug, max_pages)
+            return self._crawl_with_playwright(district_name, province_slug, district_slug, max_pages)
         else:
-            # Without playwright, BDS won't work (JS-rendered)
             return []

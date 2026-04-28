@@ -27,7 +27,7 @@ def run_crawl(districts=None, max_pages=None):
         max_pages = MAX_PAGES_PER_DISTRICT
 
     print("=" * 60)
-    print(f"  HCMC Real Estate Crawler")
+    print(f"  Vietnam Real Estate Crawler")
     print(f"  Started: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print(f"  Districts: {len(districts)} | Pages/district: {max_pages}")
     print("=" * 60)

@@ -1,8 +1,9 @@
 """
 Crawler for nha.chotot.com — uses their public JSON API.
-Strategy: fetch all HCMC listings (region_v2=13000), use area_name for district.
+Strategy: fetch listings from multiple regions, use area_name for district.
 """
 from crawlers.base import BaseCrawler
+from config import CHOTOT_REGIONS
 from utils import classify_property_type
 
 
@@ -10,19 +11,18 @@ class ChototCrawler(BaseCrawler):
     """Crawler for chotot.com real estate listings via API."""
 
     API_URL = "https://gateway.chotot.com/v1/public/ad-listing"
-    HCMC_REGION_ID = 13000
 
     def __init__(self):
         super().__init__()
         self.source_name = "chotot.com"
 
-    def _parse_api_listing(self, ad):
+    def _parse_api_listing(self, ad, valid_regions):
         """Parse a single listing from Chotot API response."""
         try:
-            # Verify this listing is actually in HCMC
+            # Verify region
             region = ad.get("region_v2", ad.get("region", 0))
             region_name = ad.get("region_name", "")
-            if region != 13000 and region != 13 and "Hồ Chí Minh" not in region_name:
+            if region not in valid_regions:
                 return None
 
             title = ad.get("subject", "")
@@ -47,7 +47,6 @@ class ChototCrawler(BaseCrawler):
             list_id = ad.get("list_id", ad.get("ad_id", ""))
             url = f"https://nha.chotot.com/{list_id}.htm" if list_id else ""
 
-            # Use area_name from API as district (already correct Vietnamese name)
             district = ad.get("area_name", "")
 
             address = district
@@ -76,26 +75,15 @@ class ChototCrawler(BaseCrawler):
         except Exception:
             return None
 
-    def crawl_district(self, district_name, max_pages=3):
-        """Not used — chotot crawls all HCMC at once via crawl_all."""
-        return []
-
-    def crawl_all(self, districts, max_pages=3):
-        """Crawl all HCMC listings at once, filter by district from response."""
-        print(f"[{self.source_name}] Crawling all HCMC (region-wide)...")
-
-        # Normalize district names for matching
-        district_set = set(districts)
-
-        all_listings = []
-        items_per_page = 50  # Larger pages = fewer requests
-        # Fetch enough pages to get good coverage across districts
-        # API caps at 10000, so 20 pages * 50 = 1000 listings max
-        total_pages = min(max_pages * len(districts), 20)
+    def _crawl_region(self, region_name, region_code, district_set, max_pages):
+        """Crawl all listings in a single chotot region."""
+        listings = []
+        items_per_page = 50
+        total_pages = min(max_pages * 7, 20)  # Up to 20 pages per region
 
         for page in range(total_pages):
             params = {
-                "region_v2": self.HCMC_REGION_ID,
+                "region_v2": region_code,
                 "cg": 1000,
                 "o": page * items_per_page,
                 "page": page + 1,
@@ -114,23 +102,40 @@ class ChototCrawler(BaseCrawler):
                 total = data.get("total", 0)
 
                 if page == 0:
-                    print(f"  [chotot] {total} total HCMC listings available")
+                    print(f"  [chotot] {region_name}: {total} listings available")
 
                 if not ads:
                     break
 
                 for ad in ads:
-                    listing = self._parse_api_listing(ad)
+                    listing = self._parse_api_listing(ad, {region_code})
                     if listing and listing["district"] in district_set:
-                        all_listings.append(listing)
+                        listings.append(listing)
 
-                # Stop if we've gone past all available results
                 if (page + 1) * items_per_page >= min(total, 1000):
                     break
 
             except Exception as e:
                 print(f"  [!] JSON parse error: {e}")
                 break
+
+        return listings
+
+    def crawl_district(self, district_name, max_pages=3):
+        """Not used — chotot crawls by region via crawl_all."""
+        return []
+
+    def crawl_all(self, districts, max_pages=3):
+        """Crawl listings from all configured chotot regions."""
+        district_set = set(districts)
+        all_listings = []
+
+        for region_name, region_code in CHOTOT_REGIONS.items():
+            print(f"[{self.source_name}] Crawling {region_name} (region {region_code})...")
+            region_listings = self._crawl_region(
+                region_name, region_code, district_set, max_pages
+            )
+            all_listings.extend(region_listings)
 
         # Report per-district counts
         from collections import Counter

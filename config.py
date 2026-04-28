@@ -1,15 +1,41 @@
 """
-Configuration for HCMC Real Estate Crawler
+Configuration for Vietnam Real Estate Crawler
 """
 
+# --- REGIONS ---
+# Each region has a chotot region_v2 code and a list of districts/areas to track.
+
+# Chotot region codes
+CHOTOT_REGIONS = {
+    "HCMC": 13000,
+    "Bình Dương": 12000,
+    "Khánh Hòa": 38000,   # Nha Trang is in Khánh Hòa province
+}
+
 # Ho Chi Minh City Districts
-DISTRICTS = [
+HCMC_DISTRICTS = [
     "Quận 1", "Quận 3", "Quận 4", "Quận 5", "Quận 6", "Quận 7", "Quận 8",
     "Quận 10", "Quận 11", "Quận 12", "Quận Bình Tân", "Quận Bình Thạnh",
     "Quận Gò Vấp", "Quận Phú Nhuận", "Quận Tân Bình", "Quận Tân Phú",
     "Thành phố Thủ Đức", "Huyện Bình Chánh", "Huyện Cần Giờ",
     "Huyện Củ Chi", "Huyện Hóc Môn", "Huyện Nhà Bè"
 ]
+
+# Bình Dương Districts
+BINH_DUONG_DISTRICTS = [
+    "Thành phố Thủ Dầu Một", "Thành phố Dĩ An", "Thành phố Thuận An",
+    "Thành phố Tân Uyên", "Thành phố Bến Cát", "Huyện Bàu Bàng",
+    "Huyện Bắc Tân Uyên", "Huyện Dầu Tiếng", "Huyện Phú Giáo",
+]
+
+# Nha Trang / Khánh Hòa Districts
+NHA_TRANG_DISTRICTS = [
+    "Thành phố Nha Trang", "Thành phố Cam Ranh", "Huyện Cam Lâm",
+    "Huyện Diên Khánh", "Huyện Ninh Hòa",
+]
+
+# Combined list of all tracked areas
+DISTRICTS = HCMC_DISTRICTS + BINH_DUONG_DISTRICTS + NHA_TRANG_DISTRICTS
 
 # Slug mappings for batdongsan.com.vn
 BDS_DISTRICT_SLUGS = {
@@ -37,8 +63,29 @@ BDS_DISTRICT_SLUGS = {
     "Huyện Nhà Bè": "huyen-nha-be",
 }
 
-# Note: Chotot crawler no longer needs district codes — it fetches all HCMC
-# listings and uses the area_name field from the API response for district names.
+# Slug mappings for batdongsan.com.vn — Bình Dương
+BDS_BINH_DUONG_SLUGS = {
+    "Thành phố Thủ Dầu Một": "thanh-pho-thu-dau-mot",
+    "Thành phố Dĩ An": "thanh-pho-di-an",
+    "Thành phố Thuận An": "thanh-pho-thuan-an",
+    "Thành phố Tân Uyên": "thanh-pho-tan-uyen",
+    "Thành phố Bến Cát": "thanh-pho-ben-cat",
+    "Huyện Bàu Bàng": "huyen-bau-bang",
+    "Huyện Bắc Tân Uyên": "huyen-bac-tan-uyen",
+    "Huyện Dầu Tiếng": "huyen-dau-tieng",
+    "Huyện Phú Giáo": "huyen-phu-giao",
+}
+
+# Slug mappings for batdongsan.com.vn — Khánh Hòa (Nha Trang)
+BDS_NHA_TRANG_SLUGS = {
+    "Thành phố Nha Trang": "thanh-pho-nha-trang",
+    "Thành phố Cam Ranh": "thanh-pho-cam-ranh",
+    "Huyện Cam Lâm": "huyen-cam-lam",
+    "Huyện Diên Khánh": "huyen-dien-khanh",
+    "Huyện Ninh Hòa": "huyen-ninh-hoa",
+}
+
+# Note: Chotot crawler fetches by region and uses area_name from API response.
 
 # Property type labels
 PROPERTY_TYPES = {
